@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voters Panel</title>
+    <script>
+        // Function to fetch the server's public key
+        async function fetchPublicKey() {
+            const response = await fetch('/public-key'); // Server route to provide public key
+            const keyText = await response.text();
+            return window.crypto.subtle.importKey(
+                'spki',
+                Uint8Array.from(atob(keyText), c => c.charCodeAt(0)),
+                { name: 'RSA-OAEP', hash: 'SHA-256' },
+                true,
+                ['encrypt']
+            );
+        }
+
+        // Function to encrypt the vote using the public key
+        async function encryptVote(publicKey, voteData) {
+            const encoder = new TextEncoder();
+            const encodedData = encoder.encode(voteData);
+            const encryptedBuffer = await window.crypto.subtle.encrypt(
+                { name: 'RSA-OAEP' },
+                publicKey,
+                encodedData
+            );
+            return btoa(String.fromCharCode(...new Uint8Array(encryptedBuffer)));
+        }
+
+        // Function to handle vote submission
+        async function submitVote(event, votedPerson) {
+            event.preventDefault();
+            const userId = "<%= loggedInUserId %>";
+
+            try {
+                const publicKey = await fetchPublicKey();
+                const encryptedVote = await encryptVote(publicKey, votedPerson);
+
+                // Send encrypted vote to the server
+                const response = await fetch('/vote', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId, encryptedVote })
+                });
+
+                if (response.ok) {
+                    window.location.href = "/votersPanel?isVoted=true";
+                } else {
+                    alert("Error submitting your vote.");
+                }
+            } catch (error) {
+                console.error("Encryption error:", error);
+                alert("Encryption failed.");
+            }
+        }
+    </script>
+
+    <style>
+        /* Styling for the names and buttons */
+        .voter-container {
+            margin: 20px 0;
+            padding: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #ccc;
+        }
+
+        .voter-name {
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .vote-btn {
+            padding: 8px 16px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .vote-btn:hover {
+            background-color: #0056b3;
+        }
+
+        /* Navbar Styling */
+        nav {
+            background-color: #333;
+            color: white;
+            padding: 10px 0;
+            text-align: center;
+        }
+
+        nav a {
+            color: white;
+            padding: 14px 20px;
+            text-decoration: none;
+            font-size: 16px;
+        }
+
+        nav a:hover {
+            background-color: #ddd;
+            color: black;
+        }
+    </style>
+</head>
+
+<body>
+    <%- include('./nav.ejs') %> <!-- Navbar inclusion -->
+
+    <% if(locals.isVoted === true){ %>
+        <h1>Thank You for voting!!</h1>
+    <% } else { %>
+        <div class="container">
+            <!-- Voters List -->
+            <div class="voter-container">
+                <div class="voter-name">Ayush</div>
+                <button class="vote-btn" onclick="submitVote(event, 'Ayush')">Vote</button>
+            </div>
+
+            <div class="voter-container">
+                <div class="voter-name">Yash</div>
+                <button class="vote-btn" onclick="submitVote(event, 'Yash')">Vote</button>
+            </div>
+
+            <div class="voter-container">
+                <div class="voter-name">Nishant</div>
+                <button class="vote-btn" onclick="submitVote(event, 'Nishant')">Vote</button>
+            </div>
+
+            <div class="voter-container">
+                <div class="voter-name">Rajpal</div>
+                <button class="vote-btn" onclick="submitVote(event, 'Rajpal')">Vote</button>
+            </div>
+        </div>
+    <% } %>
+
+    <%- include('./partials/head') %>
+</body>
+
+</html>
